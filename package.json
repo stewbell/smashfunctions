@@ -3,13 +3,13 @@
   "version": "1.0.0",
   "description": "test",
   "main": "index.js",
-   "scripts": {
+  "scripts": {
     "start": "functions-framework --target=helloWorld"
   },
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@google-cloud/functions-framework": "^1.7.1"
+    "@google-cloud/functions-framework": "^1.7.1",
+    "axios": "^0.20.0"
   }
 }
- 
