@@ -15,7 +15,7 @@ if (req.method === 'OPTIONS') {
 
   axios.post('https://smash-epny2zfy7q-ts.a.run.app/predict', inJSON)
   .then(function (response) {
-    console.log(response.data);
+    
     res.json(response.data);
   })
   .catch(function (error) {
