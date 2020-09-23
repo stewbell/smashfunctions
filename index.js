@@ -48,7 +48,7 @@ async function query(querySQL) {
 function loadFile(req, res) {
 
   //console.log("global var",fullDataset.datasetObj[5]);
-fullDataset.aggFilter("OREO MINI");
+  fullDataset.aggFilter("OREO SLUG");
 
   res.send("Done. JSON read");
 }
@@ -85,7 +85,9 @@ class dataset {
     // Download a file into memory. The contents will be available as the second
     // argument in the demonstration below, `contents`.
     //-
-   file.download(function (err, contents) {
+    this.datasetObj = [];
+    file.download(function (err, contents) {
+
       fileLoad.lapTime("Load complete");
       //convert from newline delimited JSON to Obj
       var lines = contents.toString().split(/\n/);
@@ -95,42 +97,46 @@ class dataset {
       fileLoad.lapTime("Create string");
       var obj = JSON.parse(wrapped);
       fileLoad.lapTime("To json");
-      console.log("debug",obj[2])
+      console.log("debug", obj[2])
       inObj.datasetObj = obj;
+      //this.datasetObj = obj;
       //dataset.initialLoad = obj;
     })
-   
+
   }
-  aggFilter(Prod){
+  aggFilter(Prod) {
     var aggTimmer = new timmer("Start Aggregation and filter")
     var sumArray = [];
     var i;
-    var a=0;
+    var a = 0;
     console.log("prod value", this.datasetObj[1].Product)
     console.log("input value", Prod)
-    
-    for (i of this.datasetObj){
+
+    for (i of this.datasetObj) {
       //console.log("count", a++);
-      if (String(Prod) == String(i.Product)){
-            var key = [String(i.Product), String(i.Period)].join('$$');
-            sumArray[key] = (sumArray[key] === 
-            undefined) ? [i.ForecastBaseline, i.ForecastTotal] : [sumArray[key][0] + i.ForecastBaseline, sumArray[key][1] + i.ForecastTotal];
-      }
-    }    
-    aggTimmer.lapTime("Agg Finished")
-    console.log("Sum Array",sumArray)
+      if (String(Prod) == String(i.Product)) {
+        var key = [String(i.Period).substring(0,7),String(i.Product)].join('$$');
+        sumArray[key] = (sumArray[key] ===
+          undefined) ? [i.ForecastBaseline, i.ForecastTotal] : [sumArray[key][0] + i.ForecastBaseline, sumArray[key][1] + i.ForecastTotal];
+      } }
+    var tempDataset = [];
+    for (key in sumArray) {
+      var a = key.split('$$');
+      var b = sumArray[key];
+      var c = [a, b].flat();
+      tempDataset.push(c);
+    }
+    tempDataset.sort();
+    aggTimmer.lapTime("Agg Finished");
+    console.log("Sum Array", tempDataset);
   }
 
 }
 
 //Load Gloabal----------------------------------------------------------------------------
-
 console.log("COLD START");
 var fullDataset = new dataset();
 fullDataset.loadFromGCS(fullDataset);
-
-
-
 
 
 //URL Routing--------------------------------------------------------------------
