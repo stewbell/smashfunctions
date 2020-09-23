@@ -1,4 +1,6 @@
 
+//Functions definitions-------------------------------------------------------------
+
 function predict(req, res) {
   var predictTime = new timmer("Call Prediction API");
   inJSON = req.body;
@@ -17,14 +19,7 @@ function predict(req, res) {
 
 };
 function loadBQforecast(req, res) {
-  query(`CALL \`modelsales1.model5.InitialProcedure\`();`).then(function (data) {
-    BQPrediction = data;
-    console.log(BQPrediction[0]);
-    res.json(BQPrediction[0]);
-
-  });
-
-
+  res.json(BQPrediction)
 }
 
 async function query(querySQL) {
@@ -48,9 +43,18 @@ async function query(querySQL) {
   const [rows] = await job.getQueryResults();
   BQqueryTimmer.lapTime("Load Complete")
   return rows;
-
 }
 
+function loadFile(req, res) {
+
+  //console.log("global var",fullDataset.datasetObj[5]);
+fullDataset.aggFilter("OREO MINI");
+
+  res.send("Done. JSON read");
+}
+
+
+//Class Definitions-------------------------------------------------------------------------
 class timmer {
   constructor(label) {
     this.label = label
@@ -64,20 +68,72 @@ class timmer {
     console.log(`${this.label} - ${lapComment} - ${lapTimeMS}ms`)
   }
 }
+class dataset {
+  initialLoad = [];
+  constructor() {
+    this.datasetObj = [];
+  }
+  loadFromGCS(inObj) {
+    const { Storage } = require('@google-cloud/storage');
+    // Creates a client
+    const storage = new Storage();
+    const myBucket = storage.bucket('smashfiles');
+    const file = myBucket.file('forecast/forecast.json');
+    var fileLoad = new timmer("Load file");
 
+    //-
+    // Download a file into memory. The contents will be available as the second
+    // argument in the demonstration below, `contents`.
+    //-
+   file.download(function (err, contents) {
+      fileLoad.lapTime("Load complete");
+      //convert from newline delimited JSON to Obj
+      var lines = contents.toString().split(/\n/);
+      lines.pop();
+      fileLoad.lapTime("Split to array");
+      var wrapped = "[" + lines.join(",") + "]";
+      fileLoad.lapTime("Create string");
+      var obj = JSON.parse(wrapped);
+      fileLoad.lapTime("To json");
+      console.log("debug",obj[2])
+      inObj.datasetObj = obj;
+      //dataset.initialLoad = obj;
+    })
+   
+  }
+  aggFilter(Prod){
+    var aggTimmer = new timmer("Start Aggregation and filter")
+    var sumArray = [];
+    var i;
+    var a=0;
+    console.log("prod value", this.datasetObj[1].Product)
+    console.log("input value", Prod)
+    
+    for (i of this.datasetObj){
+      //console.log("count", a++);
+      if (String(Prod) == String(i.Product)){
+            var key = [String(i.Product), String(i.Period)].join('$$');
+            sumArray[key] = (sumArray[key] === 
+            undefined) ? [i.ForecastBaseline, i.ForecastTotal] : [sumArray[key][0] + i.ForecastBaseline, sumArray[key][1] + i.ForecastTotal];
+      }
+    }    
+    aggTimmer.lapTime("Agg Finished")
+    console.log("Sum Array",sumArray)
+  }
 
+}
 
+//Load Gloabal----------------------------------------------------------------------------
 
-
-var BQPrediction;
 console.log("COLD START");
-query(`CALL \`modelsales1.model5.InitialProcedure\`();`).then(function (data) {
-  BQPrediction = data;
-  console.log(BQPrediction[0]);
-  
-});
+var fullDataset = new dataset();
+fullDataset.loadFromGCS(fullDataset);
 
 
+
+
+
+//URL Routing--------------------------------------------------------------------
 exports.helloWorld = (req, res) => {
   res.set('Access-Control-Allow-Origin', '*');
 
@@ -99,6 +155,11 @@ exports.helloWorld = (req, res) => {
         loadBQforecast(req, res); break;
       case '/functions/testLoadBQ':
         testloadBQ(req, res); break;
+      case '/functions/loadfile':
+        loadFile(req, res); break;
+      case '/loadfile':
+        loadFile(req, res); break;
+
       default:
         res.send("No URI found");
     }
