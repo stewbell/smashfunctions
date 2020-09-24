@@ -3,15 +3,29 @@
 
 function predict(req, res) {
   var predictTime = new timmer("Call Prediction API");
-  inJSON = req.body;
+  console.log("request", req.query);
+  predictionCombinations = fullDataset.getPredictionCombinations(req.query);
+  predictTime.lapTime("combinations creation");
+
   const axios = require('axios')
-  axios.post('https://smash-epny2zfy7q-ts.a.run.app/predict', inJSON)
+ 
+  axios.post('https://smash-epny2zfy7q-ts.a.run.app/predict', predictionCombinations)
     .then(function (response) {
-      //console.log("response", response.data);
-      predictTime.lapTime("Call completed")
+      predictTime.lapTime("Call completed");
+      //Match combination with the response
+      console.log("response",response.data.predictions);
+      var i;
+      var counter = 0;
+      for (i of predictionCombinations.instances){
+        i.ForecastTotal = response.data.predictions[counter++];
+      // console.log("combine",response[counter]);
+      }
+      console.log("forecast",predictionCombinations);
+      
+
 
       res.json(response.data);
-      return response.data;
+      //return response.data;
     })
     .catch(function (error) {
       console.log(error);
@@ -45,12 +59,8 @@ async function query(querySQL) {
   return rows;
 }
 
-function loadFile(req, res) {
-
-  //console.log("global var",fullDataset.datasetObj[5]);
-  fullDataset.aggFilter("OREO SLUG");
-
-  res.send("Done. JSON read");
+function loadData(req, res) {
+  res.json(fullDataset.aggFilter("OREO SLUG"));
 }
 
 
@@ -111,26 +121,53 @@ class dataset {
     var a = 0;
     console.log("prod value", this.datasetObj[1].Product)
     console.log("input value", Prod)
-
+    //summarise the data
     for (i of this.datasetObj) {
-      //console.log("count", a++);
       if (String(Prod) == String(i.Product)) {
-        var key = [String(i.Period).substring(0,7),String(i.Product)].join('$$');
+        var key = [String(i.Period).substring(0, 7), String(i.Product)].join('$$');
         sumArray[key] = (sumArray[key] ===
           undefined) ? [i.ForecastBaseline, i.ForecastTotal] : [sumArray[key][0] + i.ForecastBaseline, sumArray[key][1] + i.ForecastTotal];
-      } }
+      }
+    }
     var tempDataset = [];
     for (key in sumArray) {
       var a = key.split('$$');
       var b = sumArray[key];
-      var c = [a, b].flat();
+      var c = [a[0], b].flat();
       tempDataset.push(c);
     }
     tempDataset.sort();
     aggTimmer.lapTime("Agg Finished");
     console.log("Sum Array", tempDataset);
+    return tempDataset;
   }
-
+  getPredictionCombinations(filterJSON) {
+    var promo = filterJSON.promo;
+    var product = filterJSON.product;
+    var period = filterJSON.period;
+    var i;
+    var resultLine;
+    var resultArr = []  ;
+    var outValue;
+    for (i of this.datasetObj) {
+      if (String(product) == String(i.Product)
+        && String(period) == String(i.Period)) {
+        resultLine = {
+          "MONTH": period,
+          "Distributor": i.Distributor,
+          "product": i.Product,
+          "OutletType": i.OutletType,
+          "CountryFeatures": 'NOEVENT',
+          "ProductFeatures": promo
+        }
+        resultArr.push(resultLine);
+      }
+    }
+    var outValue = new Object();
+    outValue.instances = resultArr;
+    //console.log("out value", outValue);
+    return outValue;
+  }
 }
 
 //Load Gloabal----------------------------------------------------------------------------
@@ -161,11 +198,10 @@ exports.helloWorld = (req, res) => {
         loadBQforecast(req, res); break;
       case '/functions/testLoadBQ':
         testloadBQ(req, res); break;
-      case '/functions/loadfile':
-        loadFile(req, res); break;
-      case '/loadfile':
-        loadFile(req, res); break;
-
+      case '/functions/loaddata':
+        loadData(req, res); break;
+      case '/loaddata':
+        loadData(req, res); break;
       default:
         res.send("No URI found");
     }
